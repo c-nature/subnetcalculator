@@ -211,7 +211,7 @@
 
         <!-- Arcade Mode UI -->
         <div id="arcadeUi" class="hidden text-center mb-4 text-lg">
-            <span id="timer" class="mr-4">Time left: <span id="timeLeft">15</span>s</span>
+            <span id="timer" class="mr-4">Time left: <span id="timeLeft">60</span>s</span>
             <span id="scoreBoard">Score: <span id="score">0</span></span>
         </div>
 
@@ -427,7 +427,7 @@ function getBroadcastAddress(ip, cidr) {
 
 // --- Arcade Mode Functions ---
 function startTimer() {
-    timeLeft = 15;
+    timeLeft =60;
     timeLeftEl.textContent = timeLeft;
     timerInterval = setInterval(() => {
         timeLeft--;
