@@ -1,12 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-P8">
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Retro Subnet Calculator</title>
+    <title>Retro Subnet Calculator & Quiz</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
     <style>
+        /* General Body and Container Styling */
         body {
             font-family: 'VT323', monospace;
             background-color: #1A1A2E; /* Dark bluish-purple */
@@ -25,8 +26,10 @@
             border: 3px solid #FF007F; /* Neon pink border */
             box-shadow: 0 0 15px #FF007F, 0 0 5px #FF007F inset;
             width: 100%;
-            max-width: 600px;
+            max-width: 700px;
         }
+
+        /* Header Styling */
         h1 {
             font-family: 'Press Start 2P', cursive;
             color: #00F0B5; /* Neon teal/green */
@@ -34,6 +37,29 @@
             margin-bottom: 25px;
             font-size: 1.5rem; /* Responsive font size */
         }
+
+        /* Tab Button Styling */
+        .tab-btn {
+            background-color: #FF007F;
+            color: #1A1A2E;
+            font-family: 'Press Start 2P', cursive;
+            padding: 10px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+            box-shadow: 0 0 8px #FF007F;
+            border: none;
+            font-size: 0.9rem;
+        }
+        .tab-btn.active {
+            background-color: #00F0B5;
+            box-shadow: 0 0 12px #00F0B5;
+        }
+        .tab-btn:hover {
+             transform: translateY(-2px);
+        }
+        
+        /* General Interactive Elements */
         label {
             color: #00F0B5; /* Neon teal/green */
             margin-bottom: 5px;
@@ -74,9 +100,11 @@
             box-shadow: 0 0 12px #00F0B5;
             transform: translateY(-2px);
         }
+
+        /* Results and Feedback Styling */
         .results-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
             gap: 15px;
             margin-top: 20px;
         }
@@ -98,16 +126,23 @@
             border-radius: 8px;
             text-align: center;
             font-weight: bold;
+            min-height: 40px;
         }
         .error-message {
             background-color: #FF007F; /* Pink for error */
             color: #1A1A2E;
             border: 2px solid #E0F2E9;
         }
-        .success-message { /* Not used yet, but for potential future use */
-            background-color: #00F0B5;
-            color: #1A1A2E;
-            border: 2px solid #E0F2E9;
+        #quizFeedback {
+            margin-top: 15px;
+            font-size: 1.2rem;
+            text-align: center;
+            min-height: 30px;
+        }
+
+        /* Utility Class */
+        .hidden { 
+            display: none; 
         }
 
         /* Responsive adjustments */
@@ -115,7 +150,7 @@
             h1 {
                 font-size: 1.25rem;
             }
-            button {
+            button, .tab-btn {
                 font-size: 0.8rem;
                 width: 100%;
                 margin-bottom: 10px;
@@ -123,26 +158,33 @@
             .results-grid {
                 grid-template-columns: 1fr; /* Stack results on small screens */
             }
+            .flex.justify-center.gap-4 {
+                flex-direction: column;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Subnet Calculator</h1>
+<div class="container">
+    <!-- Tab Navigation -->
+    <div class="flex justify-center gap-4 mb-6">
+        <button id="calcTab" class="tab-btn active">Calculator</button>
+        <button id="quizTab" class="tab-btn">Subnet Quiz</button>
+    </div>
 
+    <!-- Calculator Section -->
+    <div id="calculatorSection">
+        <h1>Subnet Calculator</h1>
         <div>
             <label for="ipAddress">IP Address:</label>
             <input type="text" id="ipAddress" placeholder="e.g., 192.168.1.10">
         </div>
-
         <div>
             <label for="subnetMask">Subnet Mask:</label>
             <input type="text" id="subnetMask" placeholder="e.g., 255.255.255.0">
         </div>
-
         <button id="calculateBtn">Calculate</button>
         <div id="messageArea"></div>
-
         <div class="results-grid">
             <div class="result-item"><strong>Network Address:</strong> <span id="networkAddress">-</span></div>
             <div class="result-item"><strong>Broadcast Address:</strong> <span id="broadcastAddress">-</span></div>
@@ -150,165 +192,243 @@
             <div class="result-item"><strong>Wildcard Mask:</strong> <span id="wildcardMask">-</span></div>
             <div class="result-item"><strong>Mask Bits (CIDR):</strong> <span id="maskBits">-</span></div>
         </div>
-
         <button id="generateRandomIpBtn" style="margin-top: 20px;">Generate Random IP</button>
         <div class="result-item" style="margin-top: 10px;">
             <strong>Random IP:</strong> <span id="randomIpResult">-</span>
         </div>
     </div>
 
-    <script>
-        // --- DOM Elements ---
-        const ipAddressInput = document.getElementById('ipAddress');
-        const subnetMaskInput = document.getElementById('subnetMask');
-        const calculateBtn = document.getElementById('calculateBtn');
-        const generateRandomIpBtn = document.getElementById('generateRandomIpBtn');
-        const messageArea = document.getElementById('messageArea');
+    <!-- Quiz Section -->
+    <div id="quizSection" class="hidden">
+        <h1>Subnet Quiz</h1>
+        <p id="quizQuestion" class="text-lg text-center mb-4 min-h-[50px]"></p>
+        <div>
+            <label for="quizAnswer">Your Answer:</label>
+            <input type="text" id="quizAnswer" placeholder="Number of hosts...">
+        </div>
+        <button id="submitQuiz">Submit Answer</button>
+        <button id="nextQuestion" class="ml-2">Next Question</button>
+        <p id="quizFeedback"></p>
+    </div>
+</div>
 
-        const networkAddressEl = document.getElementById('networkAddress');
-        const broadcastAddressEl = document.getElementById('broadcastAddress');
-        const numHostsEl = document.getElementById('numHosts');
-        const wildcardMaskEl = document.getElementById('wildcardMask');
-        const maskBitsEl = document.getElementById('maskBits');
-        const randomIpResultEl = document.getElementById('randomIpResult');
+<script>
+// --- GLOBAL DOM Elements ---
+const calcTab = document.getElementById('calcTab');
+const quizTab = document.getElementById('quizTab');
+const calculatorSection = document.getElementById('calculatorSection');
+const quizSection = document.getElementById('quizSection');
 
-        // Store calculated values for random IP generation
-        let currentNetworkInfo = null;
+// --- TAB SWITCHING LOGIC ---
+calcTab.addEventListener('click', () => {
+    calcTab.classList.add('active');
+    quizTab.classList.remove('active');
+    calculatorSection.classList.remove('hidden');
+    quizSection.classList.add('hidden');
+});
 
-        // --- Helper Functions (Ported from Python) ---
-        function validateIpAddress(ip) {
-            const octets = ip.split('.');
-            if (octets.length !== 4) return false;
-            return octets.every(octetStr => {
-                const octet = parseInt(octetStr);
-                return !isNaN(octet) && octet >= 0 && octet <= 255;
-            }) &&
-            (parseInt(octets[0]) >= 1 && parseInt(octets[0]) <= 223) &&
-            (parseInt(octets[0]) !== 127) &&
-            (parseInt(octets[0]) !== 169 || parseInt(octets[1]) !== 254);
-        }
+quizTab.addEventListener('click', () => {
+    quizTab.classList.add('active');
+    calcTab.classList.remove('active');
+    quizSection.classList.remove('hidden');
+    calculatorSection.classList.add('hidden');
+    generateQuizQuestion(); // Generate first question when tab is opened
+});
 
-        function validateSubnetMask(mask) {
-            const octets = mask.split('.');
-            if (octets.length !== 4) return false;
 
-            const validMaskValues = [255, 254, 252, 248, 240, 224, 192, 128, 0];
-            const numOctets = octets.map(o => parseInt(o));
+// --- CALCULATOR LOGIC ---
+const ipAddressInput = document.getElementById('ipAddress');
+const subnetMaskInput = document.getElementById('subnetMask');
+const calculateBtn = document.getElementById('calculateBtn');
+const generateRandomIpBtn = document.getElementById('generateRandomIpBtn');
+const messageArea = document.getElementById('messageArea');
+const networkAddressEl = document.getElementById('networkAddress');
+const broadcastAddressEl = document.getElementById('broadcastAddress');
+const numHostsEl = document.getElementById('numHosts');
+const wildcardMaskEl = document.getElementById('wildcardMask');
+const maskBitsEl = document.getElementById('maskBits');
+const randomIpResultEl = document.getElementById('randomIpResult');
 
-            if (numOctets.some(isNaN)) return false;
-            if (numOctets[0] !== 255) return false;
-            for (let i = 1; i < 4; i++) {
-                if (!validMaskValues.includes(numOctets[i])) return false;
-            }
-            // Check if mask is contiguous (e.g., 255.255.0.255 is invalid)
-            // Convert to binary string and check for 0 followed by 1
-            let binaryMask = numOctets.map(octet => octet.toString(2).padStart(8, '0')).join('');
-            if (binaryMask.indexOf('01') !== -1 && binaryMask.indexOf('01') < binaryMask.lastIndexOf('1')) return false;
-            
-            // Check octet order (e.g. 255.0.255.0 is invalid)
-            return numOctets[0] >= numOctets[1] && numOctets[1] >= numOctets[2] && numOctets[2] >= numOctets[3];
-        }
+let currentNetworkInfo = null; // Store calculated values
 
-        function ipToBinary(ip) {
-            return ip.split('.').map(octet => parseInt(octet).toString(2).padStart(8, '0')).join('');
-        }
+function validateIpAddress(ip) {
+    const octets = ip.split('.');
+    if (octets.length !== 4) return false;
+    return octets.every(octetStr => {
+        const octet = parseInt(octetStr);
+        return !isNaN(octet) && octet >= 0 && octet <= 255;
+    }) &&
+    (parseInt(octets[0]) >= 1 && parseInt(octets[0]) <= 223) &&
+    (parseInt(octets[0]) !== 127) &&
+    (parseInt(octets[0]) !== 169 || parseInt(octets[1]) !== 254);
+}
 
-        function binaryToIp(binary) {
-            const octets = [];
-            for (let i = 0; i < 32; i += 8) {
-                octets.push(parseInt(binary.substring(i, i + 8), 2).toString());
-            }
-            return octets.join('.');
-        }
+function validateSubnetMask(mask) {
+    const octets = mask.split('.');
+    if (octets.length !== 4) return false;
+    const numOctets = octets.map(o => parseInt(o));
+    if (numOctets.some(isNaN)) return false;
+    
+    let binaryMask = numOctets.map(octet => octet.toString(2).padStart(8, '0')).join('');
+    // A valid mask is a contiguous block of 1s followed by a contiguous block of 0s.
+    // An invalid mask would have a '0' followed by a '1'.
+    return !binaryMask.includes('01');
+}
 
-        // --- Event Listeners ---
-        calculateBtn.addEventListener('click', () => {
-            const ip = ipAddressInput.value.trim();
-            const mask = subnetMaskInput.value.trim();
+function ipToBinary(ip) {
+    return ip.split('.').map(octet => parseInt(octet).toString(2).padStart(8, '0')).join('');
+}
 
-            messageArea.textContent = '';
-            messageArea.className = ''; // Clear previous styles
+function binaryToIp(binary) {
+    const octets = [];
+    for (let i = 0; i < 32; i += 8) {
+        octets.push(parseInt(binary.substring(i, i + 8), 2).toString());
+    }
+    return octets.join('.');
+}
 
-            if (!validateIpAddress(ip)) {
-                messageArea.textContent = 'Invalid IP Address format or range.';
-                messageArea.classList.add('error-message');
-                clearResults();
-                currentNetworkInfo = null;
-                return;
-            }
-            if (!validateSubnetMask(mask)) {
-                messageArea.textContent = 'Invalid Subnet Mask format or values.';
-                messageArea.classList.add('error-message');
-                clearResults();
-                currentNetworkInfo = null;
-                return;
-            }
+function clearResults() {
+    networkAddressEl.textContent = '-';
+    broadcastAddressEl.textContent = '-';
+    numHostsEl.textContent = '-';
+    wildcardMaskEl.textContent = '-';
+    maskBitsEl.textContent = '-';
+    randomIpResultEl.textContent = '-';
+}
 
-            const binaryIp = ipToBinary(ip);
-            const binaryMask = ipToBinary(mask);
+calculateBtn.addEventListener('click', () => {
+    const ip = ipAddressInput.value.trim();
+    const mask = subnetMaskInput.value.trim();
 
-            const noOfOnes = binaryMask.split('1').length - 1;
-            const noOfZeros = 32 - noOfOnes;
-            const numHosts = Math.pow(2, noOfZeros) - 2;
+    messageArea.textContent = '';
+    messageArea.className = ''; // Clear previous styles
 
-            const networkAddressBinary = binaryIp.substring(0, noOfOnes) + '0'.repeat(noOfZeros);
-            const broadcastAddressBinary = binaryIp.substring(0, noOfOnes) + '1'.repeat(noOfZeros);
+    if (!validateIpAddress(ip)) {
+        messageArea.textContent = 'Invalid IP Address format or range.';
+        messageArea.classList.add('error-message');
+        clearResults();
+        currentNetworkInfo = null;
+        return;
+    }
+    if (!validateSubnetMask(mask)) {
+        messageArea.textContent = 'Invalid Subnet Mask. Must be contiguous.';
+        messageArea.classList.add('error-message');
+        clearResults();
+        currentNetworkInfo = null;
+        return;
+    }
 
-            const networkAddress = binaryToIp(networkAddressBinary);
-            const broadcastAddress = binaryToIp(broadcastAddressBinary);
+    const binaryIp = ipToBinary(ip);
+    const binaryMask = ipToBinary(mask);
 
-            const wildcardOctets = mask.split('.').map(octet => 255 - parseInt(octet));
-            const wildcardMask = wildcardOctets.join('.');
+    const noOfOnes = (binaryMask.match(/1/g) || []).length;
+    const noOfZeros = 32 - noOfOnes;
+    const numHosts = Math.pow(2, noOfZeros) - 2;
 
-            networkAddressEl.textContent = networkAddress;
-            broadcastAddressEl.textContent = broadcastAddress;
-            numHostsEl.textContent = numHosts < 0 ? 0 : numHosts; // Display 0 for /31, /32
-            wildcardMaskEl.textContent = wildcardMask;
-            maskBitsEl.textContent = `/${noOfOnes}`;
-            randomIpResultEl.textContent = '-'; // Reset random IP
+    const networkAddressBinary = binaryIp.substring(0, noOfOnes) + '0'.repeat(noOfZeros);
+    const broadcastAddressBinary = binaryIp.substring(0, noOfOnes) + '1'.repeat(noOfZeros);
 
-            currentNetworkInfo = {
-                networkAddressOctets: networkAddress.split('.').map(o => parseInt(o)),
-                numHosts: numHosts,
-                noOfOnes: noOfOnes
-            };
-        });
+    const networkAddress = binaryToIp(networkAddressBinary);
+    const broadcastAddress = binaryToIp(broadcastAddressBinary);
 
-        generateRandomIpBtn.addEventListener('click', () => {
-            if (!currentNetworkInfo || currentNetworkInfo.numHosts <= 0) {
-                randomIpResultEl.textContent = 'N/A (Calculate subnet first or no hosts)';
-                if (currentNetworkInfo && currentNetworkInfo.numHosts <=0) {
-                     randomIpResultEl.textContent = 'N/A (No assignable hosts)';
-                }
-                return;
-            }
+    const wildcardOctets = mask.split('.').map(octet => 255 - parseInt(octet));
+    const wildcardMask = wildcardOctets.join('.');
 
-            let netAddrInt = 0;
-            currentNetworkInfo.networkAddressOctets.forEach(octet => {
-                netAddrInt = (netAddrInt << 8) + octet;
-            });
+    networkAddressEl.textContent = networkAddress;
+    broadcastAddressEl.textContent = broadcastAddress;
+    numHostsEl.textContent = numHosts < 0 ? 0 : numHosts; // Display 0 for /31, /32
+    wildcardMaskEl.textContent = wildcardMask;
+    maskBitsEl.textContent = `/${noOfOnes}`;
+    randomIpResultEl.textContent = '-'; // Reset random IP
 
-            const randomHostNum = Math.floor(Math.random() * currentNetworkInfo.numHosts) + 1;
-            const randomIpInt = netAddrInt + randomHostNum;
+    currentNetworkInfo = {
+        networkAddressOctets: networkAddress.split('.').map(o => parseInt(o)),
+        numHosts: numHosts,
+        noOfOnes: noOfOnes
+    };
+});
 
-            const generatedIpStrParts = [];
-            let tempIpInt = randomIpInt;
-            for (let i = 0; i < 4; i++) {
-                generatedIpStrParts.unshift((tempIpInt & 255).toString());
-                tempIpInt >>= 8;
-            }
-            randomIpResultEl.textContent = generatedIpStrParts.join('.');
-        });
-        
-        function clearResults() {
-            networkAddressEl.textContent = '-';
-            broadcastAddressEl.textContent = '-';
-            numHostsEl.textContent = '-';
-            wildcardMaskEl.textContent = '-';
-            maskBitsEl.textContent = '-';
-            randomIpResultEl.textContent = '-';
-        }
+generateRandomIpBtn.addEventListener('click', () => {
+    if (!currentNetworkInfo) {
+        randomIpResultEl.textContent = 'N/A (Calculate subnet first)';
+        return;
+    }
+    if (currentNetworkInfo.numHosts <= 0) {
+        randomIpResultEl.textContent = 'N/A (No assignable hosts)';
+        return;
+    }
 
-    </script>
+    let netAddrInt = 0;
+    currentNetworkInfo.networkAddressOctets.forEach(octet => {
+        netAddrInt = (netAddrInt << 8) + octet;
+    });
+
+    const randomHostNum = Math.floor(Math.random() * currentNetworkInfo.numHosts) + 1;
+    const randomIpInt = netAddrInt + randomHostNum;
+
+    const generatedIpStrParts = [];
+    let tempIpInt = randomIpInt;
+    for (let i = 0; i < 4; i++) {
+        generatedIpStrParts.unshift((tempIpInt & 255).toString());
+        tempIpInt >>= 8;
+    }
+    randomIpResultEl.textContent = generatedIpStrParts.join('.');
+});
+
+
+// --- QUIZ LOGIC ---
+const quizQuestionEl = document.getElementById('quizQuestion');
+const quizAnswerEl = document.getElementById('quizAnswer');
+const quizFeedbackEl = document.getElementById('quizFeedback');
+const submitQuizBtn = document.getElementById('submitQuiz');
+const nextQuestionBtn = document.getElementById('nextQuestion');
+let currentQuizAnswer = '';
+
+function generateQuizQuestion() {
+    const randomIp = `192.168.${Math.floor(Math.random()*256)}.${Math.floor(Math.random()*256)}`;
+    const cidr = [24, 25, 26, 27, 28, 29, 30][Math.floor(Math.random()*7)];
+    quizQuestionEl.textContent = `What is the number of usable hosts for ${randomIp}/${cidr}?`;
+    
+    const hostBits = 32 - cidr;
+    const calculatedAnswer = Math.pow(2, hostBits) - 2;
+    currentQuizAnswer = calculatedAnswer < 0 ? 0 : calculatedAnswer; // Handle /31 and /32 cases
+
+    quizFeedbackEl.textContent = '';
+    quizAnswerEl.value = '';
+    quizAnswerEl.focus();
+}
+
+function checkQuizAnswer() {
+    const userAnswer = parseInt(quizAnswerEl.value);
+    if (isNaN(userAnswer)) {
+        quizFeedbackEl.textContent = 'Please enter a number.';
+        quizFeedbackEl.style.color = '#FF007F';
+        return;
+    }
+
+    if (userAnswer === currentQuizAnswer) {
+        quizFeedbackEl.textContent = '✅ Correct!';
+        quizFeedbackEl.style.color = '#00F0B5';
+    } else {
+        quizFeedbackEl.textContent = `❌ Incorrect. The correct answer is ${currentQuizAnswer}.`;
+        quizFeedbackEl.style.color = '#FF007F';
+    }
+}
+
+submitQuizBtn.addEventListener('click', checkQuizAnswer);
+nextQuestionBtn.addEventListener('click', generateQuizQuestion);
+
+// Allow submitting quiz with Enter key
+quizAnswerEl.addEventListener('keyup', function(event) {
+    if (event.key === 'Enter') {
+        event.preventDefault();
+        checkQuizAnswer();
+    }
+});
+
+// Generate the first quiz question on page load
+generateQuizQuestion();
+
+</script>
 </body>
 </html>
