@@ -18,6 +18,8 @@
             min-height: 100vh;
             padding: 20px;
             overflow-y: auto; /* Allow vertical scrolling */
+            font-size: 18px; /* Increased base font size for readability */
+            line-height: 1.6; /* Added for better spacing between lines */
         }
         .container {
             background-color: #2A2A4E; /* Slightly lighter dark purple */
@@ -401,7 +403,7 @@ const timeLeftEl = document.getElementById('timeLeft');
 const scoreEl = document.getElementById('score');
 
 let timerInterval;
-let timeLeft = 15;
+let timeLeft = 60;
 let score = 0;
 let arcadeMode = false;
 let currentQuizAnswer = '';
@@ -425,7 +427,7 @@ function getBroadcastAddress(ip, cidr) {
 
 // --- Arcade Mode Functions ---
 function startTimer() {
-    timeLeft = 60;
+    timeLeft = 15;
     timeLeftEl.textContent = timeLeft;
     timerInterval = setInterval(() => {
         timeLeft--;
