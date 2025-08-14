@@ -204,7 +204,7 @@
         <p id="quizQuestion" class="text-lg text-center mb-4 min-h-[50px]"></p>
         <div>
             <label for="quizAnswer">Your Answer:</label>
-            <input type="text" id="quizAnswer" placeholder="Number of hosts...">
+            <input type="text" id="quizAnswer" placeholder="Your answer here...">
         </div>
         <button id="submitQuiz">Submit Answer</button>
         <button id="nextQuestion" class="ml-2">Next Question</button>
@@ -376,7 +376,7 @@ generateRandomIpBtn.addEventListener('click', () => {
 });
 
 
-// --- QUIZ LOGIC ---
+// --- QUIZ LOGIC (NEW VERSION) ---
 const quizQuestionEl = document.getElementById('quizQuestion');
 const quizAnswerEl = document.getElementById('quizAnswer');
 const quizFeedbackEl = document.getElementById('quizFeedback');
@@ -384,29 +384,55 @@ const submitQuizBtn = document.getElementById('submitQuiz');
 const nextQuestionBtn = document.getElementById('nextQuestion');
 let currentQuizAnswer = '';
 
+function getNetworkAddress(ip, cidr) {
+    const ipParts = ip.split('.').map(Number);
+    const mask = -1 << (32 - cidr); // More concise way to create the mask
+    const ipInt = (ipParts[0] << 24) | (ipParts[1] << 16) | (ipParts[2] << 8) | ipParts[3];
+    const netInt = ipInt & mask;
+    return [(netInt >>> 24) & 255, (netInt >>> 16) & 255, (netInt >>> 8) & 255, netInt & 255].join('.');
+}
+
+function getBroadcastAddress(ip, cidr) {
+    const ipParts = ip.split('.').map(Number);
+    const mask = -1 << (32 - cidr);
+    const ipInt = (ipParts[0] << 24) | (ipParts[1] << 16) | (ipParts[2] << 8) | ipParts[3];
+    const bcastInt = ipInt | (~mask);
+    return [(bcastInt >>> 24) & 255, (bcastInt >>> 16) & 255, (bcastInt >>> 8) & 255, bcastInt & 255].join('.');
+}
+
 function generateQuizQuestion() {
     const randomIp = `192.168.${Math.floor(Math.random()*256)}.${Math.floor(Math.random()*256)}`;
     const cidr = [24, 25, 26, 27, 28, 29, 30][Math.floor(Math.random()*7)];
-    quizQuestionEl.textContent = `What is the number of usable hosts for ${randomIp}/${cidr}?`;
-    
     const hostBits = 32 - cidr;
-    const calculatedAnswer = Math.pow(2, hostBits) - 2;
-    currentQuizAnswer = calculatedAnswer < 0 ? 0 : calculatedAnswer; // Handle /31 and /32 cases
+    const numHostsCalc = Math.pow(2, hostBits) - 2;
+    const numHosts = numHostsCalc < 0 ? 0 : numHostsCalc;
 
+    const questionType = Math.floor(Math.random() * 3); // 0: hosts, 1: CIDR, 2: network/broadcast
+
+    if (questionType === 0) {
+        quizQuestionEl.textContent = `Given ${randomIp}/${cidr}, how many usable hosts?`;
+        currentQuizAnswer = numHosts.toString();
+    } else if (questionType === 1) {
+        quizQuestionEl.textContent = `Given a need for ${numHosts} usable hosts, what is the smallest possible CIDR subnet?`;
+        currentQuizAnswer = `/${cidr}`;
+    } else { // questionType === 2
+        const networkAddress = getNetworkAddress(randomIp, cidr);
+        const broadcastAddress = getBroadcastAddress(randomIp, cidr);
+        if (Math.random() < 0.5) {
+            quizQuestionEl.textContent = `Given ${randomIp}/${cidr}, what is the network address?`;
+            currentQuizAnswer = networkAddress;
+        } else {
+            quizQuestionEl.textContent = `Given ${randomIp}/${cidr}, what is the broadcast address?`;
+            currentQuizAnswer = broadcastAddress;
+        }
+    }
     quizFeedbackEl.textContent = '';
     quizAnswerEl.value = '';
     quizAnswerEl.focus();
 }
 
 function checkQuizAnswer() {
-    const userAnswer = parseInt(quizAnswerEl.value);
-    if (isNaN(userAnswer)) {
-        quizFeedbackEl.textContent = 'Please enter a number.';
-        quizFeedbackEl.style.color = '#FF007F';
-        return;
-    }
-
-    if (userAnswer === currentQuizAnswer) {
+    if (quizAnswerEl.value.trim().toLowerCase() === currentQuizAnswer.toLowerCase()) {
         quizFeedbackEl.textContent = '✅ Correct!';
         quizFeedbackEl.style.color = '#00F0B5';
     } else {
