@@ -242,6 +242,7 @@
     <!-- Audio files for the game -->
     <audio id="correctAnswerSound" src="subnetcorrect.mp3" preload="auto"></audio>
     <audio id="wrongAnswerSound" src="subnetwrong.mp3" preload="auto"></audio>
+    <audio id="gameOverSound" src="subnetgameover.mp3" preload="auto"></audio>
 
     <script>
         // --- DOM Elements ---
@@ -272,7 +273,8 @@
         const feedbackArea = document.getElementById('feedbackArea');
         const quitGameBtn = document.getElementById('quitGameBtn');
         const correctAnswerSound = document.getElementById('correctAnswerSound');
-        const wrongAnswerSound = document.getElementById('wrongAnswerSound'); // Sound element
+        const wrongAnswerSound = document.getElementById('wrongAnswerSound');
+        const gameOverSound = document.getElementById('gameOverSound'); // Sound element
 
         // --- State Variables ---
         let currentNetworkInfo = null;
@@ -638,6 +640,10 @@
         }
 
         function gameOver() {
+            if(gameOverSound) {
+                gameOverSound.currentTime = 0;
+                gameOverSound.play().catch(e => console.error("Error playing sound:", e));
+            }
             questionDisplayEl.innerText = `Game Over!\nYou ran out of lives.\nYour final score is ${score}.`;
             answerInput.style.display = 'none';
             submitAnswerBtn.style.display = 'none';
