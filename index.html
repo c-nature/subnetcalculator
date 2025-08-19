@@ -86,6 +86,12 @@
             cursor: not-allowed;
             box-shadow: none;
         }
+        #hintBtn {
+            background-color: #f0ad4e; /* A nice orange for hints */
+        }
+        #hintBtn:hover:not(:disabled) {
+            background-color: #eea236;
+        }
         .results-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -118,13 +124,20 @@
             font-size: 1.5rem;
             letter-spacing: 0.2rem;
         }
-        #messageArea, #feedbackArea {
+        #messageArea, #feedbackArea, #hintArea {
             margin-top: 15px;
             padding: 10px;
             border-radius: 8px;
             text-align: center;
             font-weight: bold;
             min-height: 40px;
+        }
+        #hintArea {
+            background-color: #2A2A4E;
+            border: 1px dashed #f0ad4e;
+            color: #f0ad4e;
+            font-size: 0.9rem;
+            white-space: pre-wrap; /* To respect newlines in binary strings */
         }
         .error-message {
             background-color: #FF007F;
@@ -234,6 +247,8 @@
                 <button id="prevQuestionBtn">Previous</button>
                 <button id="submitAnswerBtn">Submit</button>
             </div>
+            <button id="hintBtn">Hint (-1 Life)</button>
+            <div id="hintArea" style="display: none;"></div>
             <div id="feedbackArea"></div>
              <button id="quitGameBtn" class="mt-4">Quit Game</button>
         </div>
@@ -270,16 +285,19 @@
         const multipleChoiceOptionsEl = document.getElementById('multipleChoiceOptions');
         const submitAnswerBtn = document.getElementById('submitAnswerBtn');
         const prevQuestionBtn = document.getElementById('prevQuestionBtn');
+        const hintBtn = document.getElementById('hintBtn');
+        const hintArea = document.getElementById('hintArea');
         const feedbackArea = document.getElementById('feedbackArea');
         const quitGameBtn = document.getElementById('quitGameBtn');
         const correctAnswerSound = document.getElementById('correctAnswerSound');
         const wrongAnswerSound = document.getElementById('wrongAnswerSound');
-        const gameOverSound = document.getElementById('gameOverSound'); // Sound element
+        const gameOverSound = document.getElementById('gameOverSound');
 
         // --- State Variables ---
         let currentNetworkInfo = null;
         let gameQuestions = [];
         let userAnswers = [];
+        let hintsUsed = []; // Track hints used per question
         let activeQuestionIndex = 0;
         let displayIndex = 0;
         let score = 0;
@@ -345,6 +363,7 @@
             const firstHostBinary = networkAddressBinary.slice(0, 31) + '1';
             const lastHostBinary = broadcastAddressBinary.slice(0, 31) + '0';
             return {
+                ip, mask, binaryIp, binaryMask,
                 networkAddress, broadcastAddress,
                 numHosts: numHosts < 0 ? 0 : numHosts,
                 wildcardMask, maskBits: noOfOnes,
@@ -478,13 +497,12 @@
                     case 'What is the CIDR notation?': answer = `/${details.maskBits}`; break;
                 }
 
-                const questionObj = { text: `${questionType}\nFor IP: ${ip}/${cidr}`, answer: answer };
+                const questionObj = { text: `${questionType}\nFor IP: ${ip}/${cidr}`, answer: answer, details: details };
 
                 if (difficulty === 'easy') {
                     const distractors = generateDistractors(answer, questionType, details);
                     questionObj.options = [...distractors, answer].sort(() => Math.random() - 0.5);
                 } else if (difficulty === 'medium') {
-                    // 50% chance for multiple choice
                     if (Math.random() > 0.5) {
                         const distractors = generateDistractors(answer, questionType, details);
                         questionObj.options = [...distractors, answer].sort(() => Math.random() - 0.5);
@@ -509,13 +527,18 @@
             questionDisplayEl.innerText = question.text;
             questionCountEl.textContent = `${index + 1}`;
             prevQuestionBtn.disabled = (index === 0);
+            hintBtn.disabled = hintsUsed[index] || (lives <= 0 && currentDifficulty !== 'easy');
+            hintArea.style.display = hintsUsed[index] ? 'block' : 'none';
+            if (hintsUsed[index]) {
+                showHint(true);
+            }
 
-            // Show/hide based on question type
+
             if (question.options) {
                 answerInput.style.display = 'none';
                 multipleChoiceOptionsEl.style.display = 'grid';
                 submitAnswerBtn.style.display = 'none';
-                multipleChoiceOptionsEl.innerHTML = ''; // Clear old options
+                multipleChoiceOptionsEl.innerHTML = '';
                 question.options.forEach(option => {
                     const button = document.createElement('button');
                     button.textContent = option;
@@ -529,7 +552,7 @@
                 answerInput.value = userAnswers[index] || '';
             }
 
-            if (index < activeQuestionIndex) { // Reviewing a past question
+            if (index < activeQuestionIndex) {
                 answerInput.readOnly = true;
                 if(question.options) {
                     multipleChoiceOptionsEl.querySelectorAll('button').forEach(btn => btn.disabled = true);
@@ -545,7 +568,7 @@
                     feedbackArea.textContent = `Your answer was incorrect. Correct answer: ${correctAnswer}`;
                     feedbackArea.className = 'error-message';
                 }
-            } else { // On the active question
+            } else {
                 answerInput.readOnly = false;
                 submitAnswerBtn.textContent = 'Submit';
                 feedbackArea.textContent = '';
@@ -600,6 +623,44 @@
             }, 1500);
         }
 
+        function showHint(isReview = false) {
+            if (lives <= 0 && !isReview && currentDifficulty !== 'easy') return;
+            const question = gameQuestions[displayIndex];
+            const type = question.text.split('\n')[0];
+            let hintText = '';
+            const binaryHint = `IP Binary:   ${question.details.binaryIp.match(/.{1,8}/g).join(' . ')}\nMask Binary: ${question.details.binaryMask.match(/.{1,8}/g).join(' . ')}`;
+
+            if (type.includes('Network Address')) {
+                hintText = "Hint: The network address is found where the host bits (0s in the mask) are all 0s.\n\n" + binaryHint;
+            } else if (type.includes('Broadcast Address')) {
+                hintText = "Hint: The broadcast address is found where the host bits (0s in the mask) are all 1s.\n\n" + binaryHint;
+            } else if (type.includes('first usable host')) {
+                hintText = "Hint: The first usable host is one greater than the network address.\n\n" + binaryHint;
+            } else if (type.includes('last usable host')) {
+                hintText = "Hint: The last usable host is one less than the broadcast address.\n\n" + binaryHint;
+            } else if (type.includes('hosts')) {
+                const hostBits = 32 - question.details.maskBits;
+                hintText = `Formula: 2^(${hostBits}) - 2`;
+            } else if (type.includes('CIDR')) {
+                hintText = "Hint: Count the number of '1's in the subnet mask's binary form.";
+            }
+
+            hintArea.innerText = hintText;
+            hintArea.style.display = 'block';
+
+            if (!isReview) {
+                if (currentDifficulty !== 'easy') {
+                    lives--;
+                    updateLivesDisplay();
+                }
+                hintsUsed[displayIndex] = true;
+                hintBtn.disabled = true;
+                if (lives <= 0) {
+                    setTimeout(gameOver, 2000);
+                }
+            }
+        }
+
         function startGame(difficulty) {
             score = 0;
             lives = 3;
@@ -607,11 +668,17 @@
             displayIndex = 0;
             currentDifficulty = difficulty;
             userAnswers = new Array(50).fill(null);
+            hintsUsed = new Array(50).fill(false);
             scoreEl.textContent = '0';
             updateLivesDisplay();
             gameQuestions = generateQuestions(difficulty, 50);
             difficultyButtonsDiv.style.display = 'none';
             gameAreaDiv.style.display = 'block';
+            if (difficulty === 'easy') {
+                hintBtn.textContent = 'Hint (Free)';
+            } else {
+                hintBtn.textContent = 'Hint (-1 Life)';
+            }
             displayQuestion(0);
         }
 
@@ -620,6 +687,7 @@
             answerInput.style.display = 'none';
             submitAnswerBtn.style.display = 'none';
             prevQuestionBtn.style.display = 'none';
+            hintBtn.style.display = 'none';
             multipleChoiceOptionsEl.style.display = 'none';
             feedbackArea.textContent = '';
             feedbackArea.className = '';
@@ -651,6 +719,7 @@
             answerInput.style.display = 'none';
             submitAnswerBtn.style.display = 'none';
             prevQuestionBtn.style.display = 'none';
+            hintBtn.style.display = 'none';
             multipleChoiceOptionsEl.style.display = 'none';
             feedbackArea.textContent = '';
             feedbackArea.className = '';
@@ -659,6 +728,8 @@
         function quitGame() {
              difficultyButtonsDiv.style.display = 'block';
              gameAreaDiv.style.display = 'none';
+             hintBtn.style.display = 'block';
+             hintBtn.textContent = 'Hint (-1 Life)';
              currentDifficulty = '';
         }
 
@@ -699,6 +770,8 @@
                 displayQuestion(displayIndex - 1);
             }
         });
+
+        hintBtn.addEventListener('click', () => showHint(false));
 
         answerInput.addEventListener('keyup', (e) => {
             if (e.key === 'Enter' && submitAnswerBtn.textContent === 'Submit') {
