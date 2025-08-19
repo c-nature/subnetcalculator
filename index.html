@@ -161,12 +161,23 @@
             display: flex;
             gap: 10px;
         }
+        #multipleChoiceOptions {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        #multipleChoiceOptions button {
+            font-size: 0.8rem;
+            padding: 12px 5px;
+        }
 
         @media (max-width: 640px) {
             h1 { font-size: 1.25rem; }
             button { font-size: 0.8rem; }
             .results-grid { grid-template-columns: 1fr; }
             .game-buttons { flex-direction: column; }
+            #multipleChoiceOptions { grid-template-columns: 1fr; }
         }
     </style>
 </head>
@@ -215,7 +226,10 @@
                 <div class="result-item"><strong>Lives:</strong> <span id="livesDisplay">❤️❤️❤️</span></div>
             </div>
             <div id="questionDisplay">Loading question...</div>
-            <input type="text" id="answerInput" placeholder="Your answer here...">
+            <div id="answerContainer">
+                <input type="text" id="answerInput" placeholder="Your answer here...">
+                <div id="multipleChoiceOptions"></div>
+            </div>
             <div class="game-buttons">
                 <button id="prevQuestionBtn">Previous</button>
                 <button id="submitAnswerBtn">Submit</button>
@@ -251,11 +265,12 @@
         const livesDisplayEl = document.getElementById('livesDisplay');
         const questionDisplayEl = document.getElementById('questionDisplay');
         const answerInput = document.getElementById('answerInput');
+        const multipleChoiceOptionsEl = document.getElementById('multipleChoiceOptions');
         const submitAnswerBtn = document.getElementById('submitAnswerBtn');
         const prevQuestionBtn = document.getElementById('prevQuestionBtn');
         const feedbackArea = document.getElementById('feedbackArea');
         const quitGameBtn = document.getElementById('quitGameBtn');
-        const correctAnswerSound = document.getElementById('correctAnswerSound'); // Sound element
+        const correctAnswerSound = document.getElementById('correctAnswerSound');
 
         // --- State Variables ---
         let currentNetworkInfo = null;
@@ -292,6 +307,14 @@
         function ipToBinary(ip) {
             return ip.split('.').map(octet => parseInt(octet).toString(2).padStart(8, '0')).join('');
         }
+        
+        function ipToInt(ip) {
+            return ip.split('.').reduce((int, octet) => (int << 8) + parseInt(octet), 0);
+        }
+
+        function intToIp(int) {
+            return [(int >>> 24) & 255, (int >> 16) & 255, (int >> 8) & 255, int & 255].join('.');
+        }
 
         function binaryToIp(binary) {
             const octets = [];
@@ -315,16 +338,12 @@
             const networkAddress = binaryToIp(networkAddressBinary);
             const broadcastAddress = binaryToIp(broadcastAddressBinary);
             const wildcardMask = mask.split('.').map(octet => 255 - parseInt(octet)).join('.');
-            
             const firstHostBinary = networkAddressBinary.slice(0, 31) + '1';
             const lastHostBinary = broadcastAddressBinary.slice(0, 31) + '0';
-
             return {
-                networkAddress,
-                broadcastAddress,
+                networkAddress, broadcastAddress,
                 numHosts: numHosts < 0 ? 0 : numHosts,
-                wildcardMask,
-                maskBits: noOfOnes,
+                wildcardMask, maskBits: noOfOnes,
                 firstHost: binaryToIp(firstHostBinary),
                 lastHost: binaryToIp(lastHostBinary),
             };
@@ -395,6 +414,36 @@
             return `${octet1}.${octet2}.${octet3}.${octet4}`;
         }
 
+        function generateDistractors(correctAnswer, type, details) {
+            const distractors = new Set();
+            let maxAttempts = 20; // Prevent infinite loops
+            while (distractors.size < 3 && maxAttempts > 0) {
+                maxAttempts--;
+                let wrongAnswer;
+                if (type.includes('IP') || type.includes('Address')) {
+                    const randomOctet = Math.floor(Math.random() * 255) + 1;
+                    const parts = correctAnswer.split('.');
+                    parts[3] = (parseInt(parts[3]) + randomOctet) % 256; // Change last octet
+                    wrongAnswer = parts.join('.');
+                } else if (type.includes('hosts')) {
+                    const num = parseInt(correctAnswer);
+                    const offset = Math.floor(Math.random() * 5) + 1;
+                    wrongAnswer = (Math.random() > 0.5) ? num + offset : Math.max(0, num - offset);
+                    wrongAnswer = wrongAnswer.toString();
+                } else if (type.includes('CIDR')) {
+                    const num = parseInt(correctAnswer.slice(1));
+                    const offset = Math.floor(Math.random() * 2) + 1;
+                    let newCidr = (Math.random() > 0.5) ? num + offset : num - offset;
+                    newCidr = Math.max(1, Math.min(31, newCidr)); // Keep CIDR in a valid range
+                    wrongAnswer = `/${newCidr}`;
+                }
+                if (wrongAnswer && wrongAnswer !== correctAnswer) {
+                    distractors.add(wrongAnswer);
+                }
+            }
+            return [...distractors];
+        }
+
         function generateQuestions(difficulty, count) {
             const questions = [];
             const questionTypes = [
@@ -424,7 +473,14 @@
                     case 'What is the last usable host IP?': answer = details.lastHost; break;
                     case 'What is the CIDR notation?': answer = `/${details.maskBits}`; break;
                 }
-                questions.push({ text: `${questionType}\nFor IP: ${ip} with mask ${mask}`, answer: answer });
+
+                const questionObj = { text: `${questionType}\nFor IP: ${ip}/${cidr}`, answer: answer };
+
+                if (difficulty === 'easy') {
+                    const distractors = generateDistractors(answer, questionType, details);
+                    questionObj.options = [...distractors, answer].sort(() => Math.random() - 0.5);
+                }
+                questions.push(questionObj);
             }
             return questions;
         }
@@ -442,13 +498,35 @@
             const question = gameQuestions[index];
             questionDisplayEl.innerText = question.text;
             questionCountEl.textContent = `${index + 1}`;
-            answerInput.value = userAnswers[index] || '';
             prevQuestionBtn.disabled = (index === 0);
+
+            // Show/hide based on question type
+            if (question.options) {
+                answerInput.style.display = 'none';
+                multipleChoiceOptionsEl.style.display = 'grid';
+                submitAnswerBtn.style.display = 'none';
+                multipleChoiceOptionsEl.innerHTML = ''; // Clear old options
+                question.options.forEach(option => {
+                    const button = document.createElement('button');
+                    button.textContent = option;
+                    button.onclick = () => checkAnswer(option);
+                    multipleChoiceOptionsEl.appendChild(button);
+                });
+            } else {
+                answerInput.style.display = 'block';
+                multipleChoiceOptionsEl.style.display = 'none';
+                submitAnswerBtn.style.display = 'block';
+                answerInput.value = userAnswers[index] || '';
+            }
 
             if (index < activeQuestionIndex) { // Reviewing a past question
                 answerInput.readOnly = true;
+                if(question.options) {
+                    multipleChoiceOptionsEl.querySelectorAll('button').forEach(btn => btn.disabled = true);
+                }
                 submitAnswerBtn.textContent = 'Next';
-                const correctAnswer = gameQuestions[index].answer;
+                submitAnswerBtn.style.display = 'block';
+                const correctAnswer = question.answer;
                 const storedAnswer = userAnswers[index];
                 if (storedAnswer && storedAnswer.toLowerCase() === correctAnswer.toLowerCase()) {
                     feedbackArea.textContent = 'Your answer was correct!';
@@ -462,19 +540,21 @@
                 submitAnswerBtn.textContent = 'Submit';
                 feedbackArea.textContent = '';
                 feedbackArea.className = '';
-                answerInput.focus();
+                if (!question.options) {
+                    answerInput.focus();
+                }
             }
         }
 
-        function checkAnswer() {
-            const userAnswer = answerInput.value.trim();
+        function checkAnswer(selectedOption = null) {
+            const userAnswer = selectedOption !== null ? selectedOption : answerInput.value.trim();
             userAnswers[activeQuestionIndex] = userAnswer;
             const correctAnswer = gameQuestions[activeQuestionIndex].answer;
             
             if (userAnswer.toLowerCase() === correctAnswer.toLowerCase()) {
                 if(correctAnswerSound) {
                     correctAnswerSound.currentTime = 0;
-                    correctAnswerSound.play();
+                    correctAnswerSound.play().catch(e => console.error("Error playing sound:", e));
                 }
                 feedbackArea.textContent = 'Correct!';
                 feedbackArea.className = 'correct-message';
@@ -494,6 +574,10 @@
             activeQuestionIndex++;
             submitAnswerBtn.disabled = true;
             prevQuestionBtn.disabled = true;
+            if(multipleChoiceOptionsEl.style.display === 'grid') {
+                multipleChoiceOptionsEl.querySelectorAll('button').forEach(btn => btn.disabled = true);
+            }
+
             setTimeout(() => {
                 submitAnswerBtn.disabled = false;
                 displayQuestion(activeQuestionIndex);
@@ -512,9 +596,6 @@
             gameQuestions = generateQuestions(difficulty, 50);
             difficultyButtonsDiv.style.display = 'none';
             gameAreaDiv.style.display = 'block';
-            answerInput.style.display = 'block';
-            submitAnswerBtn.style.display = 'block';
-            prevQuestionBtn.style.display = 'block';
             displayQuestion(0);
         }
 
@@ -523,6 +604,7 @@
             answerInput.style.display = 'none';
             submitAnswerBtn.style.display = 'none';
             prevQuestionBtn.style.display = 'none';
+            multipleChoiceOptionsEl.style.display = 'none';
             feedbackArea.textContent = '';
             feedbackArea.className = '';
 
@@ -548,6 +630,7 @@
             answerInput.style.display = 'none';
             submitAnswerBtn.style.display = 'none';
             prevQuestionBtn.style.display = 'none';
+            multipleChoiceOptionsEl.style.display = 'none';
             feedbackArea.textContent = '';
             feedbackArea.className = '';
         }
@@ -555,10 +638,6 @@
         function quitGame() {
              difficultyButtonsDiv.style.display = 'block';
              gameAreaDiv.style.display = 'none';
-             answerInput.style.display = 'block';
-             submitAnswerBtn.style.display = 'block';
-             submitAnswerBtn.textContent = 'Submit';
-             prevQuestionBtn.style.display = 'block';
              currentDifficulty = '';
         }
 
