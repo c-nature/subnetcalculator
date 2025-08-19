@@ -86,10 +86,10 @@
             cursor: not-allowed;
             box-shadow: none;
         }
-        #hintBtn {
+        #hintBtn, #explainBtn {
             background-color: #f0ad4e; /* A nice orange for hints */
         }
-        #hintBtn:hover:not(:disabled) {
+        #hintBtn:hover:not(:disabled), #explainBtn:hover:not(:disabled) {
             background-color: #eea236;
         }
         .results-grid {
@@ -124,7 +124,7 @@
             font-size: 1.5rem;
             letter-spacing: 0.2rem;
         }
-        #messageArea, #feedbackArea, #hintArea {
+        #messageArea, #feedbackArea, #hintArea, #explanationArea {
             margin-top: 15px;
             padding: 10px;
             border-radius: 8px;
@@ -132,12 +132,13 @@
             font-weight: bold;
             min-height: 40px;
         }
-        #hintArea {
+        #hintArea, #explanationArea {
             background-color: #2A2A4E;
             border: 1px dashed #f0ad4e;
-            color: #f0ad4e;
-            font-size: 0.9rem;
-            white-space: pre-wrap; /* To respect newlines in binary strings */
+            color: #E0F2E9;
+            font-size: 1rem;
+            white-space: pre-wrap;
+            text-align: left;
         }
         .error-message {
             background-color: #FF007F;
@@ -184,6 +185,15 @@
             font-size: 0.8rem;
             padding: 12px 5px;
         }
+        #chatContainer {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        #chatSendBtn {
+            width: auto;
+            font-size: 0.8rem;
+        }
 
         @media (max-width: 640px) {
             h1 { font-size: 1.25rem; }
@@ -209,6 +219,7 @@
             <input type="text" id="subnetMask" placeholder="e.g., 255.255.255.0">
         </div>
         <button id="calculateBtn">Calculate</button>
+        <button id="explainBtn" style="display: none;">✨ Explain This Subnet</button>
         <div id="messageArea"></div>
         <div class="results-grid">
             <div class="result-item"><strong>Network Address:</strong> <span id="networkAddress">-</span></div>
@@ -216,6 +227,11 @@
             <div class="result-item"><strong>Number of Hosts:</strong> <span id="numHosts">-</span></div>
             <div class="result-item"><strong>Wildcard Mask:</strong> <span id="wildcardMask">-</span></div>
             <div class="result-item"><strong>Mask Bits (CIDR):</strong> <span id="maskBits">-</span></div>
+        </div>
+        <div id="explanationArea" style="display: none;"></div>
+        <div id="chatContainer" style="display: none;">
+            <input type="text" id="chatInput" placeholder="Ask a follow-up question...">
+            <button id="chatSendBtn">Send</button>
         </div>
         <button id="generateRandomIpBtn" style="margin-top: 20px;">Generate Random IP</button>
         <div class="result-item" style="margin-top: 10px;">
@@ -264,6 +280,7 @@
         const ipAddressInput = document.getElementById('ipAddress');
         const subnetMaskInput = document.getElementById('subnetMask');
         const calculateBtn = document.getElementById('calculateBtn');
+        const explainBtn = document.getElementById('explainBtn');
         const generateRandomIpBtn = document.getElementById('generateRandomIpBtn');
         const messageArea = document.getElementById('messageArea');
         const networkAddressEl = document.getElementById('networkAddress');
@@ -272,6 +289,10 @@
         const wildcardMaskEl = document.getElementById('wildcardMask');
         const maskBitsEl = document.getElementById('maskBits');
         const randomIpResultEl = document.getElementById('randomIpResult');
+        const explanationArea = document.getElementById('explanationArea');
+        const chatContainer = document.getElementById('chatContainer');
+        const chatInput = document.getElementById('chatInput');
+        const chatSendBtn = document.getElementById('chatSendBtn');
         const modeToggleButton = document.getElementById('modeToggleButton');
         const calculatorModeDiv = document.getElementById('calculatorMode');
         const arcadeModeDiv = document.getElementById('arcadeMode');
@@ -297,12 +318,13 @@
         let currentNetworkInfo = null;
         let gameQuestions = [];
         let userAnswers = [];
-        let hintsUsed = []; // Track hints used per question
+        let hintsUsed = [];
         let activeQuestionIndex = 0;
         let displayIndex = 0;
         let score = 0;
         let lives = 3;
         let currentDifficulty = '';
+        let chatHistory = [];
 
         // --- Helper Functions ---
         function validateIpAddress(ip) {
@@ -379,6 +401,9 @@
             wildcardMaskEl.textContent = '-';
             maskBitsEl.textContent = '-';
             randomIpResultEl.textContent = '-';
+            explainBtn.style.display = 'none';
+            explanationArea.style.display = 'none';
+            chatContainer.style.display = 'none';
         }
 
         // --- Calculator Logic ---
@@ -387,6 +412,9 @@
             const mask = subnetMaskInput.value.trim();
             messageArea.textContent = '';
             messageArea.className = '';
+            explanationArea.style.display = 'none';
+            chatContainer.style.display = 'none';
+            chatHistory = [];
             const details = calculateSubnetDetails(ip, mask);
             if (!details) {
                  messageArea.textContent = 'Invalid IP Address or Subnet Mask.';
@@ -401,6 +429,7 @@
             wildcardMaskEl.textContent = details.wildcardMask;
             maskBitsEl.textContent = `/${details.maskBits}`;
             randomIpResultEl.textContent = '-';
+            explainBtn.style.display = 'block';
             currentNetworkInfo = {
                 networkAddressOctets: details.networkAddress.split('.').map(o => parseInt(o)),
                 numHosts: details.numHosts,
@@ -674,6 +703,9 @@
             gameQuestions = generateQuestions(difficulty, 50);
             difficultyButtonsDiv.style.display = 'none';
             gameAreaDiv.style.display = 'block';
+            submitAnswerBtn.style.display = 'block';
+            prevQuestionBtn.style.display = 'block';
+            hintBtn.style.display = 'block';
             if (difficulty === 'easy') {
                 hintBtn.textContent = 'Hint (Free)';
             } else {
@@ -733,6 +765,107 @@
              currentDifficulty = '';
         }
 
+        // --- Gemini API Integration ---
+        function renderChatHistory() {
+            explanationArea.innerHTML = '';
+            chatHistory.forEach((message, index) => {
+                // This condition hides the initial system prompt from the user view
+                if (index === 0 && message.role === 'user') return;
+
+                const messageDiv = document.createElement('div');
+                const messageP = document.createElement('p');
+                messageP.innerText = message.parts[0].text;
+                
+                if (message.role === 'user') {
+                    messageDiv.className = 'flex justify-end my-2';
+                    messageP.className = 'bg-[#FF007F] text-[#1A1A2E] p-3 rounded-lg max-w-xs md:max-w-md';
+                } else {
+                    messageDiv.className = 'flex justify-start my-2';
+                    messageP.className = 'bg-[#00F0B5] text-[#1A1A2E] p-3 rounded-lg max-w-xs md:max-w-md';
+                }
+                
+                messageDiv.appendChild(messageP);
+                explanationArea.appendChild(messageDiv);
+            });
+            explanationArea.scrollTop = explanationArea.scrollHeight; // Scroll to bottom
+        }
+
+        async function callGeminiAPI() {
+            chatSendBtn.disabled = true;
+            const thinkingP = document.createElement('p');
+            thinkingP.innerText = '✨ Thinking...';
+            thinkingP.className = 'bg-[#00F0B5] text-[#1A1A2E] p-3 rounded-lg max-w-xs md:max-w-md';
+            const thinkingDiv = document.createElement('div');
+            thinkingDiv.className = 'flex justify-start my-2';
+            thinkingDiv.appendChild(thinkingP);
+            explanationArea.appendChild(thinkingDiv);
+            
+            try {
+                const payload = { contents: chatHistory };
+                const apiKey = "";
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+                
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) throw new Error(`API request failed with status ${response.status}`);
+                
+                const result = await response.json();
+                
+                if (result.candidates && result.candidates[0].content.parts[0].text) {
+                    chatHistory.push({ role: 'model', parts: [{ text: result.candidates[0].content.parts[0].text }] });
+                } else {
+                    chatHistory.push({ role: 'model', parts: [{ text: 'Sorry, I could not get a response.' }] });
+                }
+            } catch (error) {
+                console.error("Gemini API Error:", error);
+                chatHistory.push({ role: 'model', parts: [{ text: 'Sorry, an error occurred. Please try again.' }] });
+            } finally {
+                renderChatHistory();
+                chatSendBtn.disabled = false;
+            }
+        }
+
+        async function getInitialExplanation() {
+            explanationArea.style.display = 'block';
+            explanationArea.innerHTML = ''; // Clear previous content
+            explainBtn.disabled = true;
+            chatHistory = []; // Reset history
+
+            const ip = ipAddressInput.value;
+            const mask = subnetMaskInput.value;
+            const network = networkAddressEl.textContent;
+            const broadcast = broadcastAddressEl.textContent;
+            const hosts = numHostsEl.textContent;
+
+            const prompt = `
+                Briefly explain the following subnet information in 3-4 sentences for a networking student.
+                - Initial IP Address: ${ip}
+                - Subnet Mask: ${mask}
+                - Calculated Network Address: ${network}
+                - Calculated Broadcast Address: ${broadcast}
+                - Number of Usable Hosts: ${hosts}
+            `;
+            
+            chatHistory.push({ role: 'user', parts: [{ text: prompt }] });
+            await callGeminiAPI();
+            chatContainer.style.display = 'flex';
+            explainBtn.disabled = false;
+        }
+
+        async function handleChatSubmit() {
+            const userInput = chatInput.value.trim();
+            if (!userInput) return;
+            
+            chatHistory.push({ role: 'user', parts: [{ text: userInput }] });
+            chatInput.value = '';
+            renderChatHistory();
+            await callGeminiAPI();
+        }
+
         // --- Event Listeners ---
         modeToggleButton.addEventListener('click', () => {
             const isCalculatorVisible = calculatorModeDiv.style.display !== 'none';
@@ -772,6 +905,13 @@
         });
 
         hintBtn.addEventListener('click', () => showHint(false));
+        explainBtn.addEventListener('click', getInitialExplanation);
+        chatSendBtn.addEventListener('click', handleChatSubmit);
+        chatInput.addEventListener('keyup', (e) => {
+            if (e.key === 'Enter') {
+                handleChatSubmit();
+            }
+        });
 
         answerInput.addEventListener('keyup', (e) => {
             if (e.key === 'Enter' && submitAnswerBtn.textContent === 'Submit') {
