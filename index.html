@@ -563,6 +563,7 @@
             
             if (userAnswer.toLowerCase() === correctAnswer.toLowerCase()) {
                 if(correctAnswerSound) {
+                    correctAnswerSound.volume = 0.5;
                     correctAnswerSound.currentTime = 0;
                     correctAnswerSound.play().catch(e => console.error("Error playing sound:", e));
                 }
@@ -572,6 +573,7 @@
                 scoreEl.textContent = score;
             } else {
                 if(wrongAnswerSound) {
+                    wrongAnswerSound.volume = 0.5;
                     wrongAnswerSound.currentTime = 0;
                     wrongAnswerSound.play().catch(e => console.error("Error playing sound:", e));
                 }
@@ -641,6 +643,7 @@
 
         function gameOver() {
             if(gameOverSound) {
+                gameOverSound.volume = 0.5;
                 gameOverSound.currentTime = 0;
                 gameOverSound.play().catch(e => console.error("Error playing sound:", e));
             }
