@@ -743,7 +743,7 @@
 
         function gameOver() {
             if(gameOverSound) {
-                gameOverSound.volume = 0.5;
+                gameOverSound.volume = 0.1;
                 gameOverSound.currentTime = 0;
                 gameOverSound.play().catch(e => console.error("Error playing sound:", e));
             }
