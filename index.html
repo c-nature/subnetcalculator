@@ -481,6 +481,12 @@
                 if (difficulty === 'easy') {
                     const distractors = generateDistractors(answer, questionType, details);
                     questionObj.options = [...distractors, answer].sort(() => Math.random() - 0.5);
+                } else if (difficulty === 'medium') {
+                    // 50% chance for multiple choice
+                    if (Math.random() > 0.5) {
+                        const distractors = generateDistractors(answer, questionType, details);
+                        questionObj.options = [...distractors, answer].sort(() => Math.random() - 0.5);
+                    }
                 }
                 questions.push(questionObj);
             }
