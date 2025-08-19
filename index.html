@@ -801,14 +801,13 @@
             explanationArea.appendChild(thinkingDiv);
             
             try {
-                const payload = { contents: chatHistory };
-                const apiKey = "AIzaSyCI8LDZIy48eKT0IGlPu0iVFBIEVxHMEko";
-                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+                // The backend URL should point to your Render service
+                const backendUrl = 'https://your-render-app-name.onrender.com/api/subnet-explainer';
                 
-                const response = await fetch(apiUrl, {
+                const response = await fetch(backendUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
+                    body: JSON.stringify({ contents: chatHistory })
                 });
 
                 if (!response.ok) throw new Error(`API request failed with status ${response.status}`);
@@ -821,7 +820,7 @@
                     chatHistory.push({ role: 'model', parts: [{ text: 'Sorry, I could not get a response.' }] });
                 }
             } catch (error) {
-                console.error("Gemini API Error:", error);
+                console.error("API Error:", error);
                 chatHistory.push({ role: 'model', parts: [{ text: 'Sorry, an error occurred. Please try again.' }] });
             } finally {
                 renderChatHistory();
@@ -842,7 +841,10 @@
             const hosts = numHostsEl.textContent;
 
             const prompt = `
-                Briefly explain the following subnet information in 3-4 sentences for a networking student.
+                You are "The Network Ninja," a master network administrator with deep expertise in IT, cybersecurity, networking, and subnetting. Your tone is knowledgeable, precise, and helpful.
+                Your task is to answer questions strictly related to networking, IT, cybersecurity, and subnetting. If a user asks a question outside of these topics, you must politely decline and state that your expertise is limited to networking-related subjects.
+
+                Now, briefly explain the following subnet information in 3-4 sentences for a networking student.
                 - Initial IP Address: ${ip}
                 - Subnet Mask: ${mask}
                 - Calculated Network Address: ${network}
