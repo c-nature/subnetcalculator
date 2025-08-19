@@ -241,6 +241,7 @@
 
     <!-- Audio files for the game -->
     <audio id="correctAnswerSound" src="subnetcorrect.mp3" preload="auto"></audio>
+    <audio id="wrongAnswerSound" src="subnetwrong.mp3" preload="auto"></audio>
 
     <script>
         // --- DOM Elements ---
@@ -271,6 +272,7 @@
         const feedbackArea = document.getElementById('feedbackArea');
         const quitGameBtn = document.getElementById('quitGameBtn');
         const correctAnswerSound = document.getElementById('correctAnswerSound');
+        const wrongAnswerSound = document.getElementById('wrongAnswerSound'); // Sound element
 
         // --- State Variables ---
         let currentNetworkInfo = null;
@@ -561,6 +563,10 @@
                 score++;
                 scoreEl.textContent = score;
             } else {
+                if(wrongAnswerSound) {
+                    wrongAnswerSound.currentTime = 0;
+                    wrongAnswerSound.play().catch(e => console.error("Error playing sound:", e));
+                }
                 feedbackArea.textContent = `Incorrect! The answer was: ${correctAnswer}`;
                 feedbackArea.className = 'error-message';
                 lives--;
