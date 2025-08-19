@@ -92,17 +92,31 @@
             gap: 15px;
             margin-top: 20px;
         }
+        .game-stats {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
         .result-item {
             background-color: #1A1A2E;
             padding: 10px;
             border-radius: 8px;
             border: 2px solid #00F0B5;
             box-shadow: 0 0 5px #00F0B5 inset;
+            flex-grow: 1;
+            text-align: center;
         }
         .result-item strong {
             color: #FF007F;
             display: block;
             margin-bottom: 5px;
+        }
+        #livesDisplay {
+            color: #FF007F; /* Neon pink hearts */
+            font-size: 1.5rem;
+            letter-spacing: 0.2rem;
         }
         #messageArea, #feedbackArea {
             margin-top: 15px;
@@ -195,9 +209,10 @@
             <button data-difficulty="hard">Hard</button>
         </div>
         <div id="gameArea" style="display: none;">
-            <div class="flex justify-between mb-4">
+            <div class="game-stats">
                 <div class="result-item"><strong>Score:</strong> <span id="score">0</span></div>
                 <div class="result-item"><strong>Question:</strong> <span id="questionCount">1</span> / 50</div>
+                <div class="result-item"><strong>Lives:</strong> <span id="livesDisplay">❤️❤️❤️</span></div>
             </div>
             <div id="questionDisplay">Loading question...</div>
             <input type="text" id="answerInput" placeholder="Your answer here...">
@@ -209,6 +224,9 @@
              <button id="quitGameBtn" class="mt-4">Quit Game</button>
         </div>
     </div>
+
+    <!-- Audio files for the game -->
+    <audio id="correctAnswerSound" src="subnetcorrect.mp3" preload="auto"></audio>
 
     <script>
         // --- DOM Elements ---
@@ -230,20 +248,23 @@
         const gameAreaDiv = document.getElementById('gameArea');
         const scoreEl = document.getElementById('score');
         const questionCountEl = document.getElementById('questionCount');
+        const livesDisplayEl = document.getElementById('livesDisplay');
         const questionDisplayEl = document.getElementById('questionDisplay');
         const answerInput = document.getElementById('answerInput');
         const submitAnswerBtn = document.getElementById('submitAnswerBtn');
         const prevQuestionBtn = document.getElementById('prevQuestionBtn');
         const feedbackArea = document.getElementById('feedbackArea');
         const quitGameBtn = document.getElementById('quitGameBtn');
+        const correctAnswerSound = document.getElementById('correctAnswerSound'); // Sound element
 
         // --- State Variables ---
         let currentNetworkInfo = null;
         let gameQuestions = [];
         let userAnswers = [];
-        let activeQuestionIndex = 0; // The "frontier" of questions the user has answered
-        let displayIndex = 0; // The question currently being displayed
+        let activeQuestionIndex = 0;
+        let displayIndex = 0;
         let score = 0;
+        let lives = 3;
         let currentDifficulty = '';
 
         // --- Helper Functions ---
@@ -408,10 +429,14 @@
             return questions;
         }
 
+        function updateLivesDisplay() {
+            livesDisplayEl.textContent = '❤️'.repeat(lives);
+        }
+
         function displayQuestion(index) {
             displayIndex = index;
             if (index >= gameQuestions.length) {
-                endGame();
+                winGame();
                 return;
             }
             const question = gameQuestions[index];
@@ -447,13 +472,25 @@
             const correctAnswer = gameQuestions[activeQuestionIndex].answer;
             
             if (userAnswer.toLowerCase() === correctAnswer.toLowerCase()) {
+                if(correctAnswerSound) {
+                    correctAnswerSound.currentTime = 0;
+                    correctAnswerSound.play();
+                }
                 feedbackArea.textContent = 'Correct!';
                 feedbackArea.className = 'correct-message';
+                score++;
+                scoreEl.textContent = score;
             } else {
                 feedbackArea.textContent = `Incorrect! The answer was: ${correctAnswer}`;
                 feedbackArea.className = 'error-message';
+                lives--;
+                updateLivesDisplay();
+                if (lives <= 0) {
+                    setTimeout(gameOver, 1500);
+                    return;
+                }
             }
-            recalculateScore();
+            
             activeQuestionIndex++;
             submitAnswerBtn.disabled = true;
             prevQuestionBtn.disabled = true;
@@ -463,24 +500,15 @@
             }, 1500);
         }
 
-        function recalculateScore() {
-            score = 0;
-            // Only score questions up to the active (latest answered) index
-            for(let i = 0; i < activeQuestionIndex + 1; i++) {
-                if(userAnswers[i] && gameQuestions[i] && userAnswers[i].toLowerCase() === gameQuestions[i].answer.toLowerCase()) {
-                    score++;
-                }
-            }
-            scoreEl.textContent = score;
-        }
-
         function startGame(difficulty) {
             score = 0;
+            lives = 3;
             activeQuestionIndex = 0;
             displayIndex = 0;
             currentDifficulty = difficulty;
             userAnswers = new Array(50).fill(null);
             scoreEl.textContent = '0';
+            updateLivesDisplay();
             gameQuestions = generateQuestions(difficulty, 50);
             difficultyButtonsDiv.style.display = 'none';
             gameAreaDiv.style.display = 'block';
@@ -490,31 +518,38 @@
             displayQuestion(0);
         }
 
-        function endGame() {
-            questionDisplayEl.innerText = `Game Over!\nYour final score is ${score} out of 50.`;
+        function winGame() {
+            questionDisplayEl.innerText = `You completed the level!\nYour final score is ${score} out of 50.`;
             answerInput.style.display = 'none';
             submitAnswerBtn.style.display = 'none';
             prevQuestionBtn.style.display = 'none';
             feedbackArea.textContent = '';
             feedbackArea.className = '';
 
-            if (score === 50) {
-                let badgeName = '';
-                let badgeDisplayName = '';
-                if (currentDifficulty === 'easy') { badgeName = 'networknovice'; badgeDisplayName = 'Network Novice'; } 
-                else if (currentDifficulty === 'medium') { badgeName = 'networktechnician'; badgeDisplayName = 'Network Technician'; } 
-                else if (currentDifficulty === 'hard') { badgeName = 'networkadmin'; badgeDisplayName = 'Network Admin'; }
+            let badgeName = '';
+            let badgeDisplayName = '';
+            if (currentDifficulty === 'easy') { badgeName = 'networknovice'; badgeDisplayName = 'Network Novice'; } 
+            else if (currentDifficulty === 'medium') { badgeName = 'networktechnician'; badgeDisplayName = 'Network Technician'; } 
+            else if (currentDifficulty === 'hard') { badgeName = 'networkadmin'; badgeDisplayName = 'Network Admin'; }
 
-                if (badgeName && window.parent && typeof window.parent.awardBadge === 'function') {
-                    try {
-                        window.parent.awardBadge(badgeName, badgeDisplayName);
-                    } catch (e) {
-                        console.error("Could not award badge. Error communicating with parent window:", e);
-                    }
-                } else {
-                     console.log("Not in an iframe or parent awardBadge function not found. Badge not awarded.");
+            if (badgeName && window.parent && typeof window.parent.awardBadge === 'function') {
+                try {
+                    window.parent.awardBadge(badgeName, badgeDisplayName);
+                } catch (e) {
+                    console.error("Could not award badge. Error communicating with parent window:", e);
                 }
+            } else {
+                 console.log("Not in an iframe or parent awardBadge function not found. Badge not awarded.");
             }
+        }
+
+        function gameOver() {
+            questionDisplayEl.innerText = `Game Over!\nYou ran out of lives.\nYour final score is ${score}.`;
+            answerInput.style.display = 'none';
+            submitAnswerBtn.style.display = 'none';
+            prevQuestionBtn.style.display = 'none';
+            feedbackArea.textContent = '';
+            feedbackArea.className = '';
         }
         
         function quitGame() {
