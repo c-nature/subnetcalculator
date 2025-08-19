@@ -7,6 +7,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
     <style>
+        /* General Body and Container Styling */
         body {
             font-family: 'VT323', monospace;
             background-color: #1A1A2E; /* Dark bluish-purple */
@@ -29,6 +30,8 @@
             max-width: 600px;
             margin-top: 20px;
         }
+
+        /* Header Styling */
         h1 {
             font-family: 'Press Start 2P', cursive;
             color: #00F0B5; /* Neon teal/green */
@@ -36,6 +39,29 @@
             margin-bottom: 25px;
             font-size: 1.5rem;
         }
+
+        /* Tab & Mode Button Styling */
+        .tab-btn {
+            background-color: #FF007F;
+            color: #1A1A2E;
+            font-family: 'Press Start 2P', cursive;
+            padding: 10px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+            box-shadow: 0 0 8px #FF007F;
+            border: none;
+            font-size: 0.9rem;
+        }
+        .tab-btn.active {
+            background-color: #00F0B5;
+            box-shadow: 0 0 12px #00F0B5;
+        }
+        .tab-btn:hover {
+             transform: translateY(-2px);
+        }
+        
+        /* General Interactive Elements */
         label {
             color: #00F0B5;
             margin-bottom: 5px;
@@ -88,7 +114,7 @@
         }
         .results-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
             gap: 15px;
             margin-top: 20px;
         }
@@ -258,6 +284,8 @@
             (parseInt(octets[0]) !== 127) &&
             (parseInt(octets[0]) !== 169 || parseInt(octets[1]) !== 254);
         }
+    }, 1000);
+}
 
         function validateSubnetMask(mask) {
             const octets = mask.split('.');
@@ -267,17 +295,30 @@
             let binaryMask = numOctets.map(octet => octet.toString(2).padStart(8, '0')).join('');
             return !binaryMask.includes('01');
         }
+    }
+    quizFeedbackEl.textContent = '';
+    quizAnswerEl.value = '';
+    quizAnswerEl.disabled = false;
+    quizAnswerEl.focus();
+}
 
-        function ipToBinary(ip) {
-            return ip.split('.').map(octet => parseInt(octet).toString(2).padStart(8, '0')).join('');
+function checkQuizAnswer() {
+    stopTimer();
+    quizAnswerEl.disabled = true;
+
+    if (quizAnswerEl.value.trim().toLowerCase() === currentQuizAnswer.toLowerCase()) {
+        quizFeedbackEl.textContent = '✅ Correct!';
+        quizFeedbackEl.style.color = '#00F0B5';
+        if (arcadeMode) {
+            score += 10;
+            scoreEl.textContent = score;
+            setTimeout(generateQuizQuestion, 1000);
         }
-
-        function binaryToIp(binary) {
-            const octets = [];
-            for (let i = 0; i < 32; i += 8) {
-                octets.push(parseInt(binary.substring(i, i + 8), 2).toString());
-            }
-            return octets.join('.');
+    } else {
+        quizFeedbackEl.textContent = `❌ Incorrect. The correct answer is ${currentQuizAnswer}.`;
+        quizFeedbackEl.style.color = '#FF007F';
+        if (arcadeMode) {
+             setTimeout(generateQuizQuestion, 2000);
         }
         
         function calculateSubnetDetails(ip, mask) {
