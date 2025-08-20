@@ -6,6 +6,8 @@
     <title>Retro Subnet Calculator & Arcade</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+    <!-- Confetti.js library (for standalone badge notifications) -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
     <style>
         body {
             font-family: 'VT323', monospace;
@@ -195,6 +197,32 @@
             font-size: 0.8rem;
         }
 
+        /* --- Styles for the standalone badge notification pop-up --- */
+        #badge-notification {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0.5);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.5s, transform 0.5s;
+            z-index: 2000;
+            text-align: center;
+            font-family: 'Press Start 2P', cursive;
+        }
+        #badge-notification.show {
+            transform: translate(-50%, -50%) scale(1);
+            opacity: 1;
+            pointer-events: auto;
+        }
+        #badge-notification h2, #badge-notification p {
+            color: white;
+            text-shadow: 
+                -2px -2px 0 #000, 2px -2px 0 #000, 
+                -2px 2px 0 #000, 2px 2px 0 #000, 
+                4px 4px 8px rgba(0,0,0,0.6);
+        }
+
         @media (max-width: 640px) {
             h1 { font-size: 1.25rem; }
             button { font-size: 0.8rem; }
@@ -270,10 +298,19 @@
         </div>
     </div>
 
+    <!-- Standalone Badge Notification Pop-up -->
+    <div id="badge-notification" class="hidden flex flex-col items-center">
+        <h2 class="text-3xl font-bold text-yellow-300 mb-4">New Badge Unlocked!</h2>
+        <img id="badge-notification-img" src="" alt="New Badge" class="w-48 h-48 mb-4">
+        <p id="badge-notification-name" class="text-2xl text-white font-semibold"></p>
+    </div>
+
     <!-- Audio files for the game -->
-    <audio id="correctAnswerSound" src="subnetcorrect.mp3" preload="auto"></audio>
-    <audio id="wrongAnswerSound" src="subnetwrong.mp3" preload="auto"></audio>
-    <audio id="gameOverSound" src="subnetgameover.mp3" preload="auto"></audio>
+    <audio id="correctAnswerSound" src="https://c-nature.github.io/subnetcalculator/subnetcorrect.mp3" preload="auto"></audio>
+    <audio id="wrongAnswerSound" src="https://c-nature.github.io/subnetcalculator/subnetwrong.mp3" preload="auto"></audio>
+    <audio id="gameOverSound" src="https://c-nature.github.io/subnetcalculator/subnetgameover.mp3" preload="auto"></audio>
+    <audio id="badgeSoundElement" preload="auto"> <source src="https://c-nature.github.io/smartypants/badge.wav" type="audio/wav"> </audio>
+
 
     <script>
         // --- DOM Elements ---
@@ -325,6 +362,70 @@
         let lives = 3;
         let currentDifficulty = '';
         let chatHistory = [];
+
+        // --- Badge Awarding Logic ---
+        const APP_API_BASE_URL = 'https://smartypantsbe.onrender.com/api/user';
+
+        function showBadgeNotification(badgeName, badgeDisplayName) {
+            const badgeNotification = document.getElementById('badge-notification');
+            const badgeNotificationImg = document.getElementById('badge-notification-img');
+            const badgeNotificationName = document.getElementById('badge-notification-name');
+            const badgeSoundElement = document.getElementById('badgeSoundElement');
+
+            if (badgeSoundElement) {
+                badgeSoundElement.currentTime = 0;
+                badgeSoundElement.play().catch(e => console.warn("Error playing badge sound:", e));
+            }
+            if (typeof confetti === 'function') {
+                confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+            }
+            badgeNotificationImg.src = `https://c-nature.github.io/smartypants/Badges/${badgeName}.png`;
+            badgeNotificationName.textContent = badgeDisplayName;
+            badgeNotification.classList.remove('hidden');
+            setTimeout(() => { badgeNotification.classList.add('show'); }, 10);
+            setTimeout(() => {
+                badgeNotification.classList.remove('show');
+                setTimeout(() => { badgeNotification.classList.add('hidden'); }, 500);
+            }, 4000);
+        }
+
+        async function awardBadge(badgeName, badgeDisplayName) {
+            if (window.self !== window.top && window.parent.awardBadge) {
+                console.log(`Awarding badge '${badgeName}' via parent window.`);
+                window.parent.awardBadge(badgeName, badgeDisplayName);
+                return;
+            }
+            console.log(`Awarding badge '${badgeName}' via direct API call.`);
+            try {
+                const token = localStorage.getItem('token');
+                const userString = localStorage.getItem('user');
+                if (!token || !userString) {
+                    console.log("Direct badge award failed: User not logged in.");
+                    return;
+                }
+                const user = JSON.parse(userString);
+                if (user.badges && user.badges.includes(badgeName)) {
+                    console.log(`Direct badge award skipped: User already has badge '${badgeName}'.`);
+                    return;
+                }
+                const response = await fetch(`${APP_API_BASE_URL}/award-badge`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify({ userId: user._id, badgeName: badgeName })
+                });
+                const result = await response.json();
+                if (result.status === "Success" && !result.alreadyAwarded) {
+                    console.log(`Badge '${badgeName}' awarded successfully via API.`);
+                    user.badges.push(badgeName);
+                    localStorage.setItem('user', JSON.stringify(user));
+                    showBadgeNotification(badgeName, badgeDisplayName);
+                } else {
+                    console.log("Badge already awarded or other error.", result.message);
+                }
+            } catch (error) {
+                console.error("Error awarding badge directly via API:", error);
+            }
+        }
 
         // --- Helper Functions ---
         function validateIpAddress(ip) {
@@ -468,14 +569,14 @@
 
         function generateDistractors(correctAnswer, type, details) {
             const distractors = new Set();
-            let maxAttempts = 20; // Prevent infinite loops
+            let maxAttempts = 20;
             while (distractors.size < 3 && maxAttempts > 0) {
                 maxAttempts--;
                 let wrongAnswer;
                 if (type.includes('IP') || type.includes('Address')) {
                     const randomOctet = Math.floor(Math.random() * 255) + 1;
                     const parts = correctAnswer.split('.');
-                    parts[3] = (parseInt(parts[3]) + randomOctet) % 256; // Change last octet
+                    parts[3] = (parseInt(parts[3]) + randomOctet) % 256;
                     wrongAnswer = parts.join('.');
                 } else if (type.includes('hosts')) {
                     const num = parseInt(correctAnswer);
@@ -486,7 +587,7 @@
                     const num = parseInt(correctAnswer.slice(1));
                     const offset = Math.floor(Math.random() * 2) + 1;
                     let newCidr = (Math.random() > 0.5) ? num + offset : num - offset;
-                    newCidr = Math.max(1, Math.min(31, newCidr)); // Keep CIDR in a valid range
+                    newCidr = Math.max(1, Math.min(31, newCidr));
                     wrongAnswer = `/${newCidr}`;
                 }
                 if (wrongAnswer && wrongAnswer !== correctAnswer) {
@@ -730,14 +831,8 @@
             else if (currentDifficulty === 'medium') { badgeName = 'networktechnician'; badgeDisplayName = 'Network Technician'; } 
             else if (currentDifficulty === 'hard') { badgeName = 'networkadmin'; badgeDisplayName = 'Network Admin'; }
 
-            if (badgeName && window.parent && typeof window.parent.awardBadge === 'function') {
-                try {
-                    window.parent.awardBadge(badgeName, badgeDisplayName);
-                } catch (e) {
-                    console.error("Could not award badge. Error communicating with parent window:", e);
-                }
-            } else {
-                 console.log("Not in an iframe or parent awardBadge function not found. Badge not awarded.");
+            if (badgeName) {
+                awardBadge(badgeName, badgeDisplayName);
             }
         }
 
@@ -769,7 +864,6 @@
         function renderChatHistory() {
             explanationArea.innerHTML = '';
             chatHistory.forEach((message, index) => {
-                // This condition hides the initial system prompt from the user view
                 if (index === 0 && message.role === 'user') return;
 
                 const messageDiv = document.createElement('div');
@@ -787,7 +881,7 @@
                 messageDiv.appendChild(messageP);
                 explanationArea.appendChild(messageDiv);
             });
-            explanationArea.scrollTop = explanationArea.scrollHeight; // Scroll to bottom
+            explanationArea.scrollTop = explanationArea.scrollHeight;
         }
 
         async function callGeminiAPI() {
@@ -801,7 +895,6 @@
             explanationArea.appendChild(thinkingDiv);
             
             try {
-                // The backend URL should point to your Render service
                 const backendUrl = 'https://smartypantsbe.onrender.com/api/subnet-explainer';
                 
                 const response = await fetch(backendUrl, {
@@ -830,9 +923,9 @@
 
         async function getInitialExplanation() {
             explanationArea.style.display = 'block';
-            explanationArea.innerHTML = ''; // Clear previous content
+            explanationArea.innerHTML = '';
             explainBtn.disabled = true;
-            chatHistory = []; // Reset history
+            chatHistory = [];
 
             const ip = ipAddressInput.value;
             const mask = subnetMaskInput.value;
@@ -923,6 +1016,19 @@
         
         quitGameBtn.addEventListener('click', quitGame);
 
+        // --- Initial Setup on page load ---
+        window.onload = function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const authToken = urlParams.get('authToken');
+            const userData = urlParams.get('userData');
+            if (authToken && userData) {
+                console.log("Auth data found in URL, setting up standalone session...");
+                localStorage.setItem('token', authToken);
+                localStorage.setItem('user', userData);
+                window.history.replaceState({}, document.title, window.location.pathname);
+            }
+        };
+
     </script>
 </body>
-</ht
+</html>
